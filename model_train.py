@@ -177,7 +177,7 @@ def train(height=CAPTCHA_HEIGHT, width=CAPTCHA_WIDTH, y_size=len(CAPTCHA_LIST)*C
         batch_x, batch_y = get_next_batch(64)
         sess.run(optimizer, feed_dict={x: batch_x, y: batch_y, keep_prob: 0.75})
         # 每训练一百次测试一次
-        if step % 2 == 0:
+        if step % 5 == 0:
             batch_x_test, batch_y_test = get_next_batch(10)
             acc = sess.run(accuracy, feed_dict={x: batch_x_test, y: batch_y_test, keep_prob: 1.0})
             print(datetime.now().strftime('%c'), ' step:', step, ' accuracy:', acc)

@@ -1,9 +1,10 @@
 # -*- coding:utf-8 -*-
 # description:辅助功能，图片预处理，转向量，生成测试集训练集
 
-from PIL import Image
+from PIL import Image, ImageDraw
 import numpy as np
 import os
+import time
 
 NUMBER = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 
@@ -15,6 +16,8 @@ CAPTCHA_WIDTH = 160
 IMG_PATH = "./img"
 IMG_POSTFIX = ".png"
 IMG_COUNT_INDEX = 0
+
+IMG_RES_PATH = "./img_result"
 
 def convert2gray(img):
     """
@@ -55,6 +58,70 @@ def getImageByName(path, fileName):
     image = image.resize((CAPTCHA_WIDTH, CAPTCHA_HEIGHT), Image.ANTIALIAS)
     return image
 
+def getImageByName(path, fileName):
+    imageFilePath = os.path.join(path, fileName + IMG_POSTFIX)
+    image = Image.open(imageFilePath)
+    return image
+
+#二值判断,如果确认是噪声,用改点的上面一个点的灰度进行替换
+#该函数也可以改成RGB判断的,具体看需求如何
+def getPixel(image,x,y,G,N):
+    L = image.getpixel((x,y))
+    if L > G:
+        L = True
+    else:
+        L = False
+ 
+    nearDots = 0
+    if L == (image.getpixel((x - 1,y - 1)) > G):
+        nearDots += 1
+    if L == (image.getpixel((x - 1,y)) > G):
+        nearDots += 1
+    if L == (image.getpixel((x - 1,y + 1)) > G):
+        nearDots += 1
+    if L == (image.getpixel((x,y - 1)) > G):
+        nearDots += 1
+    if L == (image.getpixel((x,y + 1)) > G):
+        nearDots += 1
+    if L == (image.getpixel((x + 1,y - 1)) > G):
+        nearDots += 1
+    if L == (image.getpixel((x + 1,y)) > G):
+        nearDots += 1
+    if L == (image.getpixel((x + 1,y + 1)) > G):
+        nearDots += 1
+    if nearDots < N:
+        return image.getpixel((x,y-1))
+    else:
+        return None
+ 
+# 降噪 
+# 根据一个点A的RGB值，与周围的8个点的RBG值比较，设定一个值N（0 <N <8），当A的RGB值与周围8个点的RGB相等数小于N时，此点为噪点 
+# G: Integer 图像二值化阀值 
+# N: Integer 降噪率 0 <N <8 
+# Z: Integer 降噪次数 
+# 输出 
+#  0：降噪成功 
+#  1：降噪失败 
+def clearNoise(image,G,N,Z):
+    draw = ImageDraw.Draw(image)
+    for i in range(0,Z):
+        for x in range(1,image.size[0] - 1):
+            for y in range(1,image.size[1] - 1):
+                color = getPixel(image,x,y,G,N)
+                if color != None:
+                    draw.point((x,y),color)
+
+def binarizing(img, threshold): #input: gray image
+    pixdata = img.load()
+    w, h = img.size
+    for y in range(h):
+        for x in range(w):
+            if pixdata[x, y] < threshold:
+                pixdata[x, y] = 0
+            else:
+                pixdata[x, y] = 255
+    return img
+
 def get_next_batch(batch_count=60, width=CAPTCHA_WIDTH, height=CAPTCHA_HEIGHT):
     """
     获取训练图片组
@@ -81,6 +148,20 @@ def get_next_batch(batch_count=60, width=CAPTCHA_WIDTH, height=CAPTCHA_HEIGHT):
     IMG_COUNT_INDEX = endIndex
     return batch_x, batch_y
 
+def splitAllImage():
+    fileList = getFileNameList(IMG_PATH)
+    for tempFile in fileList:
+        image = getImageByName(IMG_PATH, tempFile)
+        image = image.convert("L")
+        image = binarizing(image, 160)
+        clearNoise(image, 160, 4, 12)
+
+        image1 = image.crop((0,0,30,40)).save(os.path.join(IMG_RES_PATH, list(tempFile)[0],str(time.time()) + IMG_POSTFIX))
+        image2 = image.crop((30,0,60,40)).save(os.path.join(IMG_RES_PATH, list(tempFile)[1],str(time.time()) + IMG_POSTFIX))
+        image3 = image.crop((60,0,90,40)).save(os.path.join(IMG_RES_PATH, list(tempFile)[2],str(time.time()) + IMG_POSTFIX))
+        image4 = image.crop((90,0,120,40)).save(os.path.join(IMG_RES_PATH, list(tempFile)[3],str(time.time()) + IMG_POSTFIX))
+
+
 if __name__ == '__main__':
     # batch_x, batch_y = get_next_batch(1)
     # print(batch_x)
@@ -90,7 +171,7 @@ if __name__ == '__main__':
     # print(batch_x2)
     # print(batch_y2)
 
-    image = getImageByName(IMG_PATH, "0032")
-    image.show()
+    splitAllImage()
+
 
 
